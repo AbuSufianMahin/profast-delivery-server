@@ -32,9 +32,18 @@ async function run() {
         await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
+        const parcelCollection = client.db("profast_delivery_db").collection("parcelCollection");
 
+        app.post('/add-parcel', async (req, res) => {
+            try {
+                const parcelData = req.body;
+                const result = await parcelCollection.insertOne(parcelData);
+                res.status(200).send(result);
+            } catch (error) {
+                res.status(500).json({ error: "Failed to add parcel" });
+            }
+        })
 
-        
     } finally { }
 }
 run().catch(console.dir);

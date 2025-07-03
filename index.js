@@ -4,7 +4,7 @@ const port = process.env.PORT || 3000;
 
 const cors = require('cors');
 require('dotenv').config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 // middlewire
 app.use(cors());
@@ -40,7 +40,7 @@ async function run() {
                 const userEmail = req.query.email;
                 const query = userEmail ? { 'senderDetails.email': userEmail } : {};
                 const options = {
-                    sort : {'parcelDetails.createdAt' : -1}
+                    sort: { 'parcelDetails.createdAt': -1 }
                 }
 
                 const result = await parcelCollection.find(query, options).toArray();
@@ -60,6 +60,22 @@ async function run() {
                 res.status(500).json({ error: "Failed to add parcel" });
             }
         })
+
+
+        app.delete('/parcels/:id', async (req, res) => {
+            try {
+                const parcelId = req.params.id;
+            
+                const result = await parcelCollection.deleteOne({
+                    _id: new ObjectId(parcelId),
+                });
+
+                return res.send(result);
+
+            } catch (error) {
+                res.send({ message: 'Server error', error });
+            }
+        });
 
     } finally { }
 }

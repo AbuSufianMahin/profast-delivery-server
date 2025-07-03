@@ -51,6 +51,18 @@ async function run() {
             }
         })
 
+        // getting parcel data with mongoDB ObjectId of parcels (not trackingId)
+        app.get('/parcels/:parcelId', async (req, res) => {
+            const { parcelId } = req.params;
+            try {
+                const parcels = await parcelCollection.findOne({ _id: new ObjectId(parcelId) })
+                res.send(parcels);
+
+            } catch (error) {
+                res.status(500).json({ message: 'Server error' });
+            }
+        });
+
         app.post('/add-parcel', async (req, res) => {
             try {
                 const parcelData = req.body;
@@ -65,7 +77,7 @@ async function run() {
         app.delete('/parcels/:id', async (req, res) => {
             try {
                 const parcelId = req.params.id;
-            
+
                 const result = await parcelCollection.deleteOne({
                     _id: new ObjectId(parcelId),
                 });
@@ -80,9 +92,6 @@ async function run() {
     } finally { }
 }
 run().catch(console.dir);
-
-
-
 
 
 app.listen(port, () => {

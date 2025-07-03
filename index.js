@@ -1,20 +1,21 @@
 const express = require('express');
 const app = express();
 const port = process.env.PORT || 3000;
-
 const cors = require('cors');
 require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
+const stripe = require('stripe')(process.env.PAYMENT_GATEWAY_KEY);
 // middlewire
 app.use(cors());
 app.use(express.json());
 
+
+
+// ==========================================================================================================================================
 app.get('/', (req, res) => {
     res.send('Profast Delivery service is running')
 })
-
-
 
 const uri = `mongodb+srv://${process.env.PROFASTDB_ADMIN_USERNAME}:${process.env.PROFASTDB_ADMIN_PASS}@cluster0.udgfocl.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -32,7 +33,9 @@ async function run() {
         await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
-        const parcelCollection = client.db("profast_delivery_db").collection("parcelCollection");
+        const db = client.db("profast_delivery_db");
+
+        const parcelCollection = db.collection("parcelCollection");
 
 
         app.get('/parcels', async (req, res) => {
@@ -71,6 +74,25 @@ async function run() {
             } catch (error) {
                 res.status(500).json({ error: "Failed to add parcel" });
             }
+        })
+
+        // payment
+        app.post('/create-payment-intent', async (req, res) => {
+            const { amountInCents } = req.body;
+
+            try {
+                const paymentIntent = await stripe.paymentIntents.create({
+                    amount: amountInCents,
+                    currency: 'usd',
+                    payment_method_types: ['card'],
+                });
+
+                res.send({ clientSecret: paymentIntent.client_secret });
+            }
+            catch (err) {
+                res.status(500).send({ error: err.message });
+            }
+
         })
 
 

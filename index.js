@@ -34,6 +34,23 @@ async function run() {
 
         const parcelCollection = client.db("profast_delivery_db").collection("parcelCollection");
 
+
+        app.get('/parcels', async (req, res) => {
+            try {
+                const userEmail = req.query.email;
+                const query = userEmail ? { 'senderDetails.email': userEmail } : {};
+                const options = {
+                    sort : {'parcelDetails.createdAt' : -1}
+                }
+
+                const result = await parcelCollection.find(query, options).toArray();
+                res.send(result);
+            }
+            catch (error) {
+                res.status(500).send({ message: 'Error Fetching parcels', error });
+            }
+        })
+
         app.post('/add-parcel', async (req, res) => {
             try {
                 const parcelData = req.body;

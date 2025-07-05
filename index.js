@@ -75,6 +75,40 @@ async function run() {
 
         }
 
+        app.get('/users/search', async (req, res) => {
+            try {
+                const { email } = req.query;
+                if (!email || email.trim() === '') {
+                    return res.status(400).send({ message: 'Query parameter is required' });
+                }
+
+                const regex = new RegExp(email, 'i'); // case-insensitive partial match
+                const users = await userCollection.find({ email: { $regex: regex } }).limit(10).toArray();
+                res.send(users);
+
+            } catch (error) {
+                res.status(500).send({ message: 'Internal Server Error' });
+            }
+        });
+
+        app.patch('/users/:userId/role', async (req, res) => {
+            const userId = req.params.userId;
+            const { role } = req.body;
+
+
+            try {
+                const result = await userCollection.updateOne(
+                    { _id: new ObjectId(userId) },
+                    { $set: { role } }
+                );
+                res.status(200).send(result);
+                
+            } catch (error) {
+                res.status(500).send({ success: false, error: error.message });
+            }
+
+        })
+
         app.post("/users", async (req, res) => {
             const email = req.body.email;
             const userExists = await userCollection.findOne({ email });

@@ -25,7 +25,7 @@ app.get('/', (req, res) => {
 })
 
 const uri = `mongodb+srv://${process.env.PROFASTDB_ADMIN_USERNAME}:${process.env.PROFASTDB_ADMIN_PASS}@cluster0.udgfocl.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
-// Create a MongoClient with a MongoClientOptions object to set the Stable API version
+
 const client = new MongoClient(uri, {
     serverApi: {
         version: ServerApiVersion.v1,
@@ -51,18 +51,20 @@ async function run() {
         // custom middlewires
         const verifyFBToken = async (req, res, next) => {
 
-            const authHeader = req.headers.Authorization;
+            const authHeader = req.headers.authorization;
             if (!authHeader) {
                 return res.status(401).send({ message: "Unauthorized Access" })
             }
 
             const token = authHeader.split(" ")[1];
+
             if (!token) {
+                console.log("HERE in !token")
                 return res.status(401).send({ message: "Unauthorized Access" })
             }
 
             try {
-                const decoded = await admin.auth().verifyIdToken();
+                const decoded = await admin.auth().verifyIdToken(token);
                 req.decoded = decoded;
                 next();
             }
@@ -107,6 +109,7 @@ async function run() {
                 }
 
                 const result = await parcelCollection.find(query, options).toArray();
+                console.log(result);
                 res.send(result);
             }
             catch (error) {
@@ -176,10 +179,54 @@ async function run() {
             }
         })
 
+        app.get('/riders/pending', async (req, res) => {
+            try {
+                const pendingRiders = await riderCollection.find({ status: 'pending' }).toArray();
+                res.status(200).send(pendingRiders);
+
+            } catch (error) {
+                res.status(500).send({ message: error.message || 'Internal Server Error' });
+            }
+        });
+
+        app.patch('/rider/status', async (req, res) => {
+            try {
+                const { riderId, riderEmail, status } = req.body
+
+                const filter = { _id: new ObjectId(riderId) }
+                const updateDoc = {
+                    $set: {
+                        status,
+                        updated_at: new Date().toISOString(),
+                    }
+                }
+
+                const riderStatusResult = await riderCollection.updateOne(filter, updateDoc);
+
+                // update the role => "user" to "rider" in userCollection
+                if (status == "Approved") {
+                    await userCollection.updateOne(
+                        { email: riderEmail },
+                        {
+                            $set: {
+                                role: 'rider',
+                                role_updated_at: new Date().toISOString(),
+                            },
+                        }
+                    );
+                }
+
+                return res.send(riderStatusResult);
+            }
+            catch {
+                return res.status(500).send({ message: 'Internal Server Error' });
+            }
+        })
+
         app.post('/add-riders', async (req, res) => {
             try {
                 const riderData = req.body;
-                const result =  await riderCollection.insertOne(riderData);
+                const result = await riderCollection.insertOne(riderData);
                 res.send(result);
 
             } catch (error) {

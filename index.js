@@ -15,7 +15,7 @@ app.use(express.json());
 const serviceAccount = require("./profast-firebase-adminsdk.json");
 
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+    credential: admin.credential.cert(serviceAccount)
 });
 
 
@@ -46,6 +46,8 @@ async function run() {
         const parcelCollection = db.collection("parcels");
         const paymentCollection = db.collection("payments");
 
+        const riderCollection = db.collection("riders");
+
         // custom middlewires
         const verifyFBToken = async (req, res, next) => {
 
@@ -59,16 +61,16 @@ async function run() {
                 return res.status(401).send({ message: "Unauthorized Access" })
             }
 
-            try{
+            try {
                 const decoded = await admin.auth().verifyIdToken();
                 req.decoded = decoded;
                 next();
             }
-            catch{
+            catch {
                 return res.status(403).send({ message: "Forbidden Access" })
             }
 
-            
+
         }
 
         app.post("/users", async (req, res) => {
@@ -174,6 +176,17 @@ async function run() {
             }
         })
 
+        app.post('/add-riders', async (req, res) => {
+            try {
+                const riderData = req.body;
+                const result =  await riderCollection.insertOne(riderData);
+                res.send(result);
+
+            } catch (error) {
+                res.status(500).send({ error: 'Internal Server Error' });
+            }
+        });
+
         // stripe payment intent 
         app.post('/create-payment-intent', async (req, res) => {
             const { amountInCents } = req.body;
@@ -188,7 +201,7 @@ async function run() {
                 res.send({ clientSecret: paymentIntent.client_secret });
             }
             catch (err) {
-                res.status(500).send({ error: err.message });
+                res.status(500).send({ message: err.message });
             }
 
         })

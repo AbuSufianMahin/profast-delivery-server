@@ -223,6 +223,15 @@ async function run() {
             }
         })
 
+        app.get('/riders/active', async (req, res) => {
+            try {
+                const activeRiders = await riderCollection.find({ status: "Approved" }).toArray();
+                res.send(activeRiders);
+            } catch (error) {
+                res.status(500).send({ message: "Internal Server Error" });
+            }
+        });
+
         app.post('/add-riders', async (req, res) => {
             try {
                 const riderData = req.body;

@@ -307,6 +307,10 @@ async function run() {
 
                 const query = {
                     status: 'Approved',
+                    $or: [
+                        { assignedParcel: { $exists: false } }, 
+                        { assignedParcel: "" }                    
+                    ]
                 };
 
                 if (city) query.riderCity = city;
@@ -319,6 +323,45 @@ async function run() {
                 res.status(500).send({ message: 'Server error fetching riders' });
             }
         });
+
+        app.patch('/parcels/:parcelId/assign-rider', async (req, res) => {
+            try {
+                const parcelId = req.params.parcelId;
+                const rider = req.body.rider;
+
+                const parcelQuery = { _id: new ObjectId(parcelId) };
+
+                const parcelRes = await parcelCollection.updateOne(
+                    parcelQuery,
+                    {
+                        $set: {
+                            assignedRider: {
+                                riderName: rider.riderName,
+                                riderEmail: rider.riderEmail,
+                                riderContact: rider.riderContact,
+                                assignedAt: new Date().toISOString()
+                            },
+                            "parcelDetails.delivery_status": "assigned"
+                        },
+                    }
+                );
+
+
+                const riderQuery = { _id: new ObjectId(rider._id) }
+
+                const riderRes = await riderCollection.updateOne(riderQuery, {
+                    $set: {
+                        assignedParcel: new ObjectId(parcelId)
+                    }
+                })
+
+                res.send(parcelRes);
+            }
+            catch (error) {
+                res.status(500).send({ error: "Server error assigning rider" });
+            }
+        })
+
 
 
         app.post('/add-riders', async (req, res) => {

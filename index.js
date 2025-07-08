@@ -259,11 +259,9 @@ async function run() {
                 if (!rider) {
                     return res.status(404).json({ error: 'Rider not found.' });
                 }
-                const assignedParcelObjectIds = rider.assignedParcels.map(id => new ObjectId(id))
 
-                const assignedParcels = await parcelCollection.find({ _id: { $in: assignedParcelObjectIds } }).toArray();
+                const assignedParcels = await parcelCollection.find({ "parcelDetails.trackingId": { $in: rider.assignedParcels } }).toArray();
                 res.send(assignedParcels);
-
             } catch (error) {
                 res.status(500).send({ error: 'Internal server error' });
             }
@@ -271,18 +269,33 @@ async function run() {
 
         app.patch('/parcels/status/:trackingId', async (req, res) => {
             const trackingId = req.params.trackingId;
-            const { status } = req.body;
+            const { status, riderEmail } = req.body;
 
             try {
+                // updating parcelDetails.delivery_status in parcelCollection
+
                 const result = await parcelCollection.updateOne(
                     { "parcelDetails.trackingId": trackingId },
                     { $set: { "parcelDetails.delivery_status": status } }
                 );
 
+                // adding trackingId in completedDeliveries and deleting it from assignedParcels
+                // when status is delivered. riderEmail is also will be given
+
+                if (status === "delivered") {
+                    await riderCollection.updateOne(
+                        { riderEmail: riderEmail },
+                        {
+                            $push: { completedDeliveries: trackingId },
+                            $pull: { assignedParcels: trackingId }
+                        }
+                    );
+                }
+
                 if (result.matchedCount === 0) {
                     return res.status(404).send({ error: "Parcel not found." });
                 }
-                res.send(result); 
+                res.send(result);
             } catch (err) {
                 res.status(500).send({ error: "Internal server error", details: err.message });
             }
@@ -367,13 +380,12 @@ async function run() {
             }
         });
 
-        app.patch('/parcels/:parcelId/assign-rider', async (req, res) => {
+        app.patch('/parcels/:trackingId/assign-rider', async (req, res) => {
             try {
-                const parcelId = req.params.parcelId;
+                const trackingId = req.params.trackingId;
                 const rider = req.body.rider;
-                console.log(parcelId);
 
-                const parcelQuery = { _id: new ObjectId(parcelId) };
+                const parcelQuery = { "parcelDetails.trackingId": trackingId };
 
                 const parcelRes = await parcelCollection.updateOne(
                     parcelQuery,
@@ -391,11 +403,11 @@ async function run() {
                 );
 
 
-                const riderQuery = { _id: new ObjectId(rider._id) }
+                const riderQuery = { riderEmail: rider.riderEmail }
 
                 const riderRes = await riderCollection.updateOne(riderQuery, {
                     $push: {
-                        assignedParcels: new ObjectId(parcelId)
+                        assignedParcels: trackingId
                     }
                 })
 

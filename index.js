@@ -186,6 +186,30 @@ async function run() {
             }
         })
 
+        app.get('/riders/completed-deliveries', async (req, res) => {
+            try {
+                const { email } = req.query;
+                if (!email) return res.status(400).send({ error: 'Email query parameter is required.' });
+
+                // Find rider by email
+                const rider = await riderCollection.findOne({ riderEmail: email });
+                
+                if (!rider) return res.status(404).send({ error: 'Rider not found' });
+
+                const completedTrackingIds = rider.completedDeliveries || [];
+
+                // Fetch parcels with those tracking IDs
+                const parcels = await parcelCollection.find({
+                    "parcelDetails.trackingId": { $in: completedTrackingIds }
+                }).toArray();
+
+                res.send(parcels);
+            } catch (err) {
+                res.status(500).send({ error: 'Server error' });
+            }
+        });
+
+
         // getting parcel data with mongoDB ObjectId of parcels (not trackingId)
         app.get('/parcels/:parcelId', async (req, res) => {
             const { parcelId } = req.params;

@@ -246,6 +246,48 @@ async function run() {
             }
         })
 
+        app.get('/rider/assigned-parcel', async (req, res) => {
+            const { email } = req.query;
+
+            if (!email) {
+                return res.status(400).json({ error: 'Email query parameter is required.' });
+            }
+
+            try {
+                const rider = await riderCollection.findOne({ riderEmail: email });
+
+                if (!rider) {
+                    return res.status(404).json({ error: 'Rider not found.' });
+                }
+                const assignedParcelObjectIds = rider.assignedParcels.map(id => new ObjectId(id))
+
+                const assignedParcels = await parcelCollection.find({ _id: { $in: assignedParcelObjectIds } }).toArray();
+                res.send(assignedParcels);
+
+            } catch (error) {
+                res.status(500).send({ error: 'Internal server error' });
+            }
+        });
+
+        app.patch('/parcels/status/:trackingId', async (req, res) => {
+            const trackingId = req.params.trackingId;
+            const { status } = req.body;
+
+            try {
+                const result = await parcelCollection.updateOne(
+                    { "parcelDetails.trackingId": trackingId },
+                    { $set: { "parcelDetails.delivery_status": status } }
+                );
+
+                if (result.matchedCount === 0) {
+                    return res.status(404).send({ error: "Parcel not found." });
+                }
+                res.send(result); 
+            } catch (err) {
+                res.status(500).send({ error: "Internal server error", details: err.message });
+            }
+        });
+
         app.get('/riders/pending', verifyFBToken, verifyAdmin, async (req, res) => {
             try {
                 const pendingRiders = await riderCollection.find({ status: 'pending' }).toArray();
@@ -308,8 +350,9 @@ async function run() {
                 const query = {
                     status: 'Approved',
                     $or: [
-                        { assignedParcel: { $exists: false } }, 
-                        { assignedParcel: "" }                    
+                        { assignedParcels: { $exists: false } },
+                        { assignedParcels: { $size: 0 } },
+                        { assignedParcels: { $not: { $size: 5 } } }
                     ]
                 };
 
@@ -328,6 +371,7 @@ async function run() {
             try {
                 const parcelId = req.params.parcelId;
                 const rider = req.body.rider;
+                console.log(parcelId);
 
                 const parcelQuery = { _id: new ObjectId(parcelId) };
 
@@ -341,7 +385,7 @@ async function run() {
                                 riderContact: rider.riderContact,
                                 assignedAt: new Date().toISOString()
                             },
-                            "parcelDetails.delivery_status": "assigned"
+                            "parcelDetails.delivery_status": "rider_assigned"
                         },
                     }
                 );
@@ -350,8 +394,8 @@ async function run() {
                 const riderQuery = { _id: new ObjectId(rider._id) }
 
                 const riderRes = await riderCollection.updateOne(riderQuery, {
-                    $set: {
-                        assignedParcel: new ObjectId(parcelId)
+                    $push: {
+                        assignedParcels: new ObjectId(parcelId)
                     }
                 })
 
@@ -418,6 +462,3 @@ run().catch(console.dir);
 app.listen(port, () => {
     console.log(`Profast delivery service listening on port ${port}`)
 })
-
-
-
